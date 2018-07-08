@@ -1,9 +1,12 @@
 package main
 
 import (
-	"time"
-
-	"gopkg.in/libgit2/git2go.v27"
+	"bufio"
+	"bytes"
+	"fmt"
+	"os"
+	"os/exec"
+	"path"
 )
 
 type priorStateInfo struct {
@@ -12,102 +15,87 @@ type priorStateInfo struct {
 	changesStashed bool
 }
 
-func branchNameFromPath(dir string) string {
-	repo, err := git.OpenRepository(dir)
-	if err != nil {
-		return ""
-	}
-
-	return branchNameFromRepo(repo)
+type objectInfo struct {
+	tree bool
+	id   string
+	name string
 }
 
-func branchNameFromRepo(repo *git.Repository) string {
-	ref, err := repo.Head()
+func writeObjectInfo(object, dest string) {
+	cmd := exec.Command("git", "cat-file", "-p", object)
+	file, err := os.Open(dest)
 	if err != nil {
-		return ""
+		fmt.Print(err)
+		panic(err)
 	}
+	defer file.Close()
+	cmd.Stdout = file
 
-	branch, err := ref.Branch().Name()
+	err = cmd.Run()
+
 	if err != nil {
-		return ""
+		fmt.Print(err)
+		panic(err)
 	}
-
-	return branch
 }
 
-func prepareRepository(dir, branchName string) *priorStateInfo {
-	priorState := &priorStateInfo{
-		false, "", false,
-	}
-	repo, err := git.OpenRepository(dir)
+func getObjectInfo(object string) []byte {
+	cmd := exec.Command("git", "cat-file", "-p", object)
+	output, err := cmd.Output()
 	if err != nil {
-		// TODO
+		fmt.Print(err)
+		panic(err)
 	}
-
-	if branchNameFromRepo(repo) == branchName {
-		return priorState
-	}
-
-	priorState.prevBranch = branchName
-	priorState.branchChanged = true
-	sig := &git.Signature{
-		Name: "Nitely Build Service",
-		When: time.Now(),
-	}
-
-	// TODO: Check whether there are any changes to make
-	_, err = repo.Stashes.Save(sig,
-		"Automatic stash to test branch "+branchName, git.StashDefault)
-	priorState.changesStashed = true
-	if err != nil {
-		// TODO
-	}
-
-	err = trySwitchToBranch(repo, branchName)
-	if err != nil {
-		// TODO
-	}
-
-	return priorState
+	return output
 }
 
-func restoreRepo(dir string, priorState *priorStateInfo) {
-	if !priorState.branchChanged {
-		return
+func inflateBlob(currentPath, object, name string) {
+	writeObjectInfo(object, path.Join(currentPath, name))
+}
+
+func inflateTree(currentPath, object, name string) {
+	newPath := path.Join(currentPath, name)
+	os.MkdirAll(newPath, os.ModeDir)
+	scanner := bufio.NewScanner(bytes.NewReader(getObjectInfo(object)))
+
+	objects := make([]objectInfo, 0)
+
+	for scanner.Scan() {
+		if scanner.Text() != "blob" && scanner.Text() != "tree" {
+			continue
+		}
+
+		newObject := objectInfo{}
+		newObject.tree = (scanner.Text() == "tree")
+		scanner.Scan()
+		newObject.id = scanner.Text()
+		scanner.Scan()
+		newObject.name = scanner.Text()
+		objects = append(objects, newObject)
 	}
 
-	repo, err := git.OpenRepository(dir)
-	if err != nil {
-		// TODO
-	}
-
-	err = trySwitchToBranch(repo, priorState.prevBranch)
-	if err != nil {
-		// TODO
-	}
-
-	if priorState.changesStashed {
-		err = repo.Stashes.Pop(0, git.StashApplyOptions{})
-
-		if err != nil {
-			// TODO
+	for _, newObject := range objects {
+		if newObject.tree {
+			inflateTree(newPath, newObject.id, newObject.name)
+		} else {
+			inflateBlob(newPath, newObject.id, newObject.name)
 		}
 	}
 }
 
-func trySwitchToBranch(repo *git.Repository, branchName string) error {
-	// TODO: Fix based on whether it's a remote repo.
-	branch, err := repo.LookupBranch(branchName, git.BranchLocal)
-	if err != nil {
-		return err
+func inflateCommit(ref, src, snapshotName string) {
+	os.Chdir(src)
+	dir := getStorageBase()
+	dest := path.Join(dir, snapshotName)
+
+	currentRef := string(getObjectInfo("HEAD"))
+	if currentRef == ref {
+		// If the head is already at a given branch, then we
+		// will want to
+		copyDir(src, dest)
+		return
 	}
 
-	err = repo.SetHead(branch.Reference.Name())
-	if err != nil {
-		return err
-	}
+	// TODO: Get the tree info and inflate it
 
-	opts := &git.CheckoutOpts{}
-	err = repo.CheckoutHead(opts)
-	return err
 }

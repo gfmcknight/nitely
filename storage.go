@@ -59,6 +59,19 @@ func insertBuildInfo(db *sql.DB, info buildInfo) {
 	db.Exec(statement, info.Name, info.AbsolutePath, info.Branch)
 }
 
+func deleteBuildInfo(db *sql.DB, name string) {
+	statement := `
+	DELETE FROM builds
+	WHERE name = ?`
+
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	db.Exec(statement, name)
+}
+
 func getBuildInfo(db *sql.DB, name string) *buildInfo {
 	statement := `
 	SELECT * FROM builds b

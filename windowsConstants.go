@@ -1,0 +1,5 @@
+// +build windows
+
+package main
+
+var buildFiles = []string{"nitely.ps1", "nitely.bat", "nitely.py"}

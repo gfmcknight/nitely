@@ -12,8 +12,10 @@ func TestBuildInfoInsertion(t *testing.T) {
 	const test3 = "test_3"
 
 	db, err := sql.Open("sqlite3", "test.db")
-	defer db.Close()
-	defer os.Remove("test.db")
+	defer func() {
+		db.Close()
+		os.Remove("test.db")
+	}()
 
 	if err != nil {
 		t.Error(err)
@@ -45,4 +47,5 @@ func TestBuildInfoInsertion(t *testing.T) {
 
 		t.Error("Input and output did not match!")
 	}
+
 }
