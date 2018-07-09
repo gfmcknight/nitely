@@ -23,7 +23,7 @@ type objectInfo struct {
 
 func writeObjectInfo(object, dest string) {
 	cmd := exec.Command("git", "cat-file", "-p", object)
-	file, err := os.Open(dest)
+	file, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0777)
 	if err != nil {
 		fmt.Print(err)
 		panic(err)
@@ -55,8 +55,10 @@ func inflateBlob(currentPath, object, name string) {
 
 func inflateTree(currentPath, object, name string) {
 	newPath := path.Join(currentPath, name)
+	fmt.Printf("Making directory %s\n", newPath)
 	os.MkdirAll(newPath, os.ModeDir)
 	scanner := bufio.NewScanner(bytes.NewReader(getObjectInfo(object)))
+	scanner.Split(bufio.ScanWords)
 
 	objects := make([]objectInfo, 0)
 
@@ -97,6 +99,7 @@ func inflateCommit(ref, src, snapshotName string) {
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(getObjectInfo(ref)))
+	scanner.Split(bufio.ScanWords)
 	treeID := ""
 	for scanner.Scan() {
 		if scanner.Text() == "tree" {

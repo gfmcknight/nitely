@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"os"
 	"path/filepath"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -21,7 +22,7 @@ type serviceInfo struct {
 }
 
 func getStorageBase() string {
-	return "." // os.Getenv("NitelyPath")
+	return os.Getenv("NitelyPath")
 }
 
 func openAndCreateStorage() *sql.DB {
