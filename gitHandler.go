@@ -96,6 +96,19 @@ func inflateCommit(ref, src, snapshotName string) {
 		return
 	}
 
-	// TODO: Get the tree info and inflate it
+	scanner := bufio.NewScanner(bytes.NewReader(getObjectInfo(ref)))
+	treeID := ""
+	for scanner.Scan() {
+		if scanner.Text() == "tree" {
+			scanner.Scan()
+			treeID = scanner.Text()
+			break
+		}
+	}
+	if treeID == "" {
+		return
+	}
+
+	inflateTree(dir, treeID, snapshotName)
 
 }
