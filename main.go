@@ -61,8 +61,9 @@ func addAction(dir string, flags map[string]string) {
 	fmt.Printf("Added build %s on branch %s\nWith path %s\n", toAdd.Name, toAdd.Branch, toAdd.AbsolutePath)
 }
 
+// Removes a build or service from the database
 func removeAction(name string, flags map[string]string) {
-
+	deleteBuildInfo(nil, name)
 }
 
 // Runs a build of the given repository

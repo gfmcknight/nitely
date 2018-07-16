@@ -58,7 +58,10 @@ func insertBuildInfo(db *sql.DB, info buildInfo) {
 		defer db.Close()
 	}
 
-	db.Exec(statement, info.Name, info.AbsolutePath, info.Branch)
+	_, err := db.Exec(statement, info.Name, info.AbsolutePath, info.Branch)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func deleteBuildInfo(db *sql.DB, name string) {
@@ -71,7 +74,10 @@ func deleteBuildInfo(db *sql.DB, name string) {
 		defer db.Close()
 	}
 
-	db.Exec(statement, name)
+	_, err := db.Exec(statement, name)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func getBuildInfo(db *sql.DB, name string) *buildInfo {
