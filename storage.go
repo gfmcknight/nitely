@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"log"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -28,7 +28,8 @@ func getStorageBase() string {
 func openAndCreateStorage() *sql.DB {
 	db, err := sql.Open("sqlite3", filepath.Join(getStorageBase()+"/build-info.db"))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Print(err)
+		panic(err)
 	}
 
 	statement := `
@@ -40,8 +41,8 @@ func openAndCreateStorage() *sql.DB {
 
 	_, err = db.Exec(statement)
 	if err != nil {
-		log.Printf("%q: %s", err, statement)
-		return nil
+		fmt.Printf("%q: %s", err, statement)
+		panic(err)
 	}
 
 	return db
@@ -91,8 +92,39 @@ func getBuildInfo(db *sql.DB, name string) *buildInfo {
 		&build.AbsolutePath,
 		&build.Branch); err != nil {
 
-		log.Fatal(err)
+		fmt.Println(err)
 	}
 
 	return &build
+}
+
+func getBuilds(db *sql.DB) []*buildInfo {
+	statement := `
+	SELECT * FROM builds`
+
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	rows, err := db.Query(statement)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	builds := make([]*buildInfo, 0)
+
+	for rows.Next() {
+		build := buildInfo{}
+		if err := rows.Scan(&build.ID,
+			&build.Name,
+			&build.AbsolutePath,
+			&build.Branch); err != nil {
+
+			fmt.Println(err)
+		}
+		builds = append(builds, &build)
+	}
+
+	return builds
 }

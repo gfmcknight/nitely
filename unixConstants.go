@@ -3,3 +3,4 @@
 package main
 
 var buildFiles = []string{"nitely.sh", "nitely.py"}
+var shell = "sh"

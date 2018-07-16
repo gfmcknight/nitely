@@ -4,9 +4,10 @@ $START=$PWD
 New-Item -Path $env:HOME -Name $MYDIR -ItemType Directory
 Set-Location ~/$MYDIR
 Write-Output -InputObject "TEST A" | Out-File ./file-a.txt -Encoding ASCII
+Copy-Item "$START/repo-builder/nitely.ps1" -Destination .
 
 git init
-git add file-a.txt
+git add file-a.txt nitely.ps1
 git commit -m "Change 1"
 
 git checkout -b other

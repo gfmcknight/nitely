@@ -25,7 +25,7 @@ func writeObjectInfo(object, dest string) {
 	cmd := exec.Command("git", "cat-file", "-p", object)
 	file, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE, 0777)
 	if err != nil {
-		fmt.Print(err)
+		fmt.Println(err)
 		panic(err)
 	}
 	defer file.Close()
@@ -34,7 +34,7 @@ func writeObjectInfo(object, dest string) {
 	err = cmd.Run()
 
 	if err != nil {
-		fmt.Print(err)
+		fmt.Println(err)
 		panic(err)
 	}
 }
@@ -43,7 +43,7 @@ func getObjectInfo(object string) []byte {
 	cmd := exec.Command("git", "cat-file", "-p", object)
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Print(err)
+		fmt.Println(err)
 		panic(err)
 	}
 	return output
@@ -55,7 +55,6 @@ func inflateBlob(currentPath, object, name string) {
 
 func inflateTree(currentPath, object, name string) {
 	newPath := path.Join(currentPath, name)
-	fmt.Printf("Making directory %s\n", newPath)
 	os.MkdirAll(newPath, os.ModeDir)
 	scanner := bufio.NewScanner(bytes.NewReader(getObjectInfo(object)))
 	scanner.Split(bufio.ScanWords)
@@ -86,14 +85,17 @@ func inflateTree(currentPath, object, name string) {
 }
 
 func inflateCommit(ref, src, snapshotName string) {
+	src = path.Clean(src)
+
 	os.Chdir(src)
 	dir := getStorageBase()
 	dest := path.Join(dir, snapshotName)
 
 	currentRef := string(getObjectInfo("HEAD"))
-	if currentRef == ref {
+	if ref == "" || currentRef == ref {
 		// If the head is already at a given branch, then we
-		// will want to
+		// will want to copy it; if the user didn't specify a
+		// branch then we want to use the working tree
 		copyDir(src, dest)
 		return
 	}

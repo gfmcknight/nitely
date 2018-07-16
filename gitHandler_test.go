@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"testing"
 )
@@ -30,11 +29,11 @@ func fileContiansLine(filepath, filename, line string) bool {
 }
 
 func TestInflateCommit(t *testing.T) {
-	cmd := exec.Command("powershell", "repo-builder\\build-a.ps1")
-	err := cmd.Run()
-	if err != nil {
-		panic(err)
-	}
+	//cmd := exec.Command("powershell", "repo-builder\\build-a.ps1")
+	//err := cmd.Run()
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	repoPath := path.Join(os.ExpandEnv("$HOME"), "nitely-test-repo")
 	snapshotPath := path.Join(getStorageBase(), "MySnapshot")

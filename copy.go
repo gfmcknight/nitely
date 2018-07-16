@@ -82,6 +82,10 @@ func copyDir(src string, dst string) (err error) {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
 
+	if pathEnd(src) == ".git" {
+		return
+	}
+
 	si, err := os.Stat(src)
 	if err != nil {
 		return err

@@ -2,24 +2,27 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func main() {
+	fmt.Println()
 	args := os.Args[1:]
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 
-	fmt.Printf(dir)
-
 	if err != nil {
-		fmt.Printf("Something went wrong getting the current directory")
+		fmt.Printf("Something went wrong getting the current directory.\n")
 		return
 	}
 
 	if len(args) < 1 {
-		fmt.Printf("USAGE")
+		fmt.Printf("USAGE\n")
 		return
 	}
 
@@ -30,12 +33,15 @@ func main() {
 		removeAction(args[1], getFlags(args))
 	case "build":
 		buildAction(args[1], getFlags(args))
+	case "list":
+		listAction()
 	}
 }
 
+// Adds a new build or service to the database
 func addAction(dir string, flags map[string]string) {
 	if newDir, exists := flags["-d"]; exists {
-		dir = filepath.Join(dir, newDir)
+		dir = newDir
 	}
 
 	toAdd := buildInfo{
@@ -52,7 +58,7 @@ func addAction(dir string, flags map[string]string) {
 	}
 
 	insertBuildInfo(nil, toAdd)
-	fmt.Printf("Added build %s on branch %s\nWith path %s", toAdd.Name, toAdd.Branch, toAdd.AbsolutePath)
+	fmt.Printf("Added build %s on branch %s\nWith path %s\n", toAdd.Name, toAdd.Branch, toAdd.AbsolutePath)
 }
 
 func removeAction(name string, flags map[string]string) {
@@ -61,25 +67,59 @@ func removeAction(name string, flags map[string]string) {
 
 // Runs a build of the given repository
 func buildAction(name string, flags map[string]string) {
-	/*buildInfo := getBuildInfo(nil, name)
-	priorState := prepareRepository(buildInfo.AbsolutePath, buildInfo.Branch)
-	defer restoreRepo(buildInfo.AbsolutePath, priorState)
+	buildInfo := getBuildInfo(nil, name)
+	snapshotName := fmt.Sprintf("SNAP-%s-%s",
+		buildInfo.Name, time.Now().Format("2006-01-02-150405"))
 
-	os.Chdir(buildInfo.AbsolutePath)
+	ref := ""
+	if buildInfo.Branch != "" {
+		ref = "refs/heads/" + buildInfo.Branch
+	}
+
+	inflateCommit(ref, buildInfo.AbsolutePath, snapshotName)
+
+	snapshotDir := path.Join(getStorageBase(), snapshotName)
+	os.Chdir(snapshotDir)
+
 	files, err := ioutil.ReadDir(".")
 	if err != nil {
-		fmt.Print(err)
+		fmt.Println(err)
 		return
 	}
 
 	for _, filename := range buildFiles {
 		if containsFile(filename, files) {
-			// TODO: Run here
+			runner := shell
+			if strings.HasSuffix(filename, ".py") {
+				runner = "python"
+			}
+
+			fmt.Printf("Running file: %s\n", filename)
+			cmd := exec.Command(runner, fmt.Sprintf("./%s", filename))
+
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				fmt.Println(string(output))
+				fmt.Println(err)
+			}
+
 			return
 		}
-	}*/
+	}
 
-	fmt.Printf("No suitable nitely file found to build")
+	fmt.Printf("No suitable nitely file found to build!\n")
+
+}
+
+// Prints a list of builds to the user that they can run
+func listAction() {
+	fmt.Print("#\tNAME\t\tBRANCH\t\tPATH\n--------------------------------------------\n")
+
+	builds := getBuilds(nil)
+	for i := 0; i < len(builds); i++ {
+		fmt.Printf("%d.\t%s\t\t%s\t\t%s\n", i+1,
+			builds[i].Name, builds[i].Branch, builds[i].AbsolutePath)
+	}
 }
 
 // Creates a map of command line flags and their values
@@ -94,8 +134,6 @@ func getFlags(args []string) map[string]string {
 			} else {
 				flags[args[i]] = " "
 			}
-
-			fmt.Printf("Added flag %s with value %s", args[i], flags[args[i]])
 		}
 	}
 
