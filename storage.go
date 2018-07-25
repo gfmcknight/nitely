@@ -17,8 +17,10 @@ type buildInfo struct {
 }
 
 type serviceInfo struct {
+	ID           int
 	Name         string
 	AbsolutePath string
+	Args         string
 }
 
 func getStorageBase() string {
@@ -38,6 +40,19 @@ func openAndCreateStorage() *sql.DB {
 		name STRING NOT NULL UNIQUE,
 		path STRING NOT NULL,
 		branch STRING);`
+
+	_, err = db.Exec(statement)
+	if err != nil {
+		fmt.Printf("%q: %s", err, statement)
+		panic(err)
+	}
+
+	statement = `
+	CREATE TABLE IF NOT EXISTS services(
+		id INTEGER NOT NULL PRIMARY KEY,
+		name STRING NOT NULL UNIQUE,
+		path STRING NOT NULL,
+		args STRING);`
 
 	_, err = db.Exec(statement)
 	if err != nil {
@@ -133,4 +148,91 @@ func getBuilds(db *sql.DB) []*buildInfo {
 	}
 
 	return builds
+}
+
+func insertServiceInfo(db *sql.DB, info serviceInfo) {
+	statement := `
+	INSERT INTO services(name, path, args)
+	VALUES(?, ?, ?)`
+
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	_, err := db.Exec(statement, info.Name, info.AbsolutePath, info.Args)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func deleteServiceInfo(db *sql.DB, name string) {
+	statement := `
+	DELETE FROM services
+	WHERE name = ?`
+
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	_, err := db.Exec(statement, name)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func getServiceInfo(db *sql.DB, name string) *serviceInfo {
+	statement := `
+	SELECT * FROM services s
+	WHERE s.name == ?`
+
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	service := serviceInfo{}
+	results := db.QueryRow(statement, name)
+
+	if err := results.Scan(&service.ID,
+		&service.Name,
+		&service.AbsolutePath,
+		&service.Args); err != nil {
+
+		fmt.Println(err)
+	}
+
+	return &service
+}
+
+func getServices(db *sql.DB) []*serviceInfo {
+	statement := `
+	SELECT * FROM services`
+
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	rows, err := db.Query(statement)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	services := make([]*serviceInfo, 0)
+
+	for rows.Next() {
+		service := serviceInfo{}
+		if err := rows.Scan(&service.ID,
+			&service.Name,
+			&service.AbsolutePath,
+			&service.Args); err != nil {
+
+			fmt.Println(err)
+		}
+		services = append(services, &service)
+	}
+
+	return services
 }

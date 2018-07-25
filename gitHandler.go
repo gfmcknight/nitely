@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 )
 
 type priorStateInfo struct {
@@ -37,6 +38,16 @@ func writeObjectInfo(object, dest string) {
 		fmt.Println(err)
 		panic(err)
 	}
+}
+
+func getHeadRef() string {
+	cmd := exec.Command("git", "symbolic-ref", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
+	return strings.Replace(string(output), "\n", "", -1)
 }
 
 func getObjectInfo(object string) []byte {
@@ -84,17 +95,18 @@ func inflateTree(currentPath, object, name string) {
 	}
 }
 
-func inflateCommit(ref, src, snapshotName string) {
+func inflateRef(ref, src, snapshotName string) {
 	src = path.Clean(src)
 
 	os.Chdir(src)
 	dir := getStorageBase()
 	dest := path.Join(dir, snapshotName)
 
-	currentRef := string(getObjectInfo("HEAD"))
+	currentRef := getHeadRef()
 	if ref == "" || currentRef == ref {
 		// If the head is already at a given branch, then we
-		// will want to copy it; if the user didn't specify a
+		// will want to copy it to test the changes they haven't
+		// yet committed; if the user didn't specify a
 		// branch then we want to use the working tree
 		copyDir(src, dest)
 		return

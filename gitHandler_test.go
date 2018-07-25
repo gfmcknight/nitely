@@ -29,16 +29,10 @@ func fileContiansLine(filepath, filename, line string) bool {
 }
 
 func TestInflateCommit(t *testing.T) {
-	//cmd := exec.Command("powershell", "repo-builder\\build-a.ps1")
-	//err := cmd.Run()
-	//if err != nil {
-	//	panic(err)
-	//}
-
 	repoPath := path.Join(os.ExpandEnv("$HOME"), "nitely-test-repo")
 	snapshotPath := path.Join(getStorageBase(), "MySnapshot")
 
-	inflateCommit("refs/heads/other2", repoPath, "MySnapshot")
+	inflateRef("refs/heads/other2", repoPath, "MySnapshot")
 
 	if !fileContiansLine(snapshotPath, "file-a.txt", "ADDITION") {
 		t.Error("File a should contain line \"ADDITION\"")
@@ -46,5 +40,13 @@ func TestInflateCommit(t *testing.T) {
 
 	if !fileContiansLine(snapshotPath, "file-c.txt", "TEST C") {
 		t.Error("File a should contain line \"TEST C\"")
+	}
+
+	snapshotPath = path.Join(getStorageBase(), "MyOtherSnapshot")
+
+	inflateRef("refs/heads/master", repoPath, "MyOtherSnapshot")
+
+	if !fileContiansLine(snapshotPath, "file-a.txt", "WORKSPACE LINE") {
+		t.Error("File a should contain line \"WORKSPACE LINE\"")
 	}
 }

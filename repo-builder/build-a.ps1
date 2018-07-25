@@ -25,4 +25,6 @@ git add .
 git commit -m "Change 3"
 git checkout master
 
+Write-Output -InputObject "WORKSPACE LINE" | Out-File ./file-a.txt -Append -Encoding ASCII
+
 Set-Location $START

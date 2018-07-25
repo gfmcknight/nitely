@@ -23,6 +23,17 @@ go build
 You will need to set the environment variable NitelyPath to the install
 location of Nitely, as well as add this location to the PATH.
 
+## Usage
+More arguments and documentation will come
+```
+Nitely add [-n <Build Name>] [-d <Directory>] [-b <Branch Name>]
+Nitely add -s <Service Filename> [-d <Directory>] [-a <Args>] [-n <Service Name>]
+Nitely remove <Name> [-s]
+Nitely build <Build Name>
+Nitely start <Service Name>
+Nitely list <builds/services>
+```
+
 ## Roadmap
 
 * Support for starting services/processes that a project requires.
