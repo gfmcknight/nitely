@@ -40,6 +40,9 @@ func main() {
 	case "list":
 		listAction(args[1])
 	}
+
+	fmt.Println()
+	fmt.Println(getZen())
 }
 
 // Adds a new build or service to the database

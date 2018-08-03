@@ -14,6 +14,7 @@ type buildInfo struct {
 	Name         string
 	AbsolutePath string
 	Branch       string
+	Remote       string
 }
 
 type serviceInfo struct {
@@ -39,7 +40,8 @@ func openAndCreateStorage() *sql.DB {
 		id INTEGER NOT NULL PRIMARY KEY,
 		name STRING NOT NULL UNIQUE,
 		path STRING NOT NULL,
-		branch STRING);`
+		branch STRING,
+		remote STRING);`
 
 	_, err = db.Exec(statement)
 	if err != nil {
@@ -65,15 +67,15 @@ func openAndCreateStorage() *sql.DB {
 
 func insertBuildInfo(db *sql.DB, info buildInfo) {
 	statement := `
-	INSERT INTO builds(name, path, branch)
-	VALUES(?, ?, ?)`
+	INSERT INTO builds(name, path, branch, remote)
+	VALUES(?, ?, ?, ?)`
 
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	_, err := db.Exec(statement, info.Name, info.AbsolutePath, info.Branch)
+	_, err := db.Exec(statement, info.Name, info.AbsolutePath, info.Branch, info.Remote)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -111,7 +113,8 @@ func getBuildInfo(db *sql.DB, name string) *buildInfo {
 	if err := results.Scan(&build.ID,
 		&build.Name,
 		&build.AbsolutePath,
-		&build.Branch); err != nil {
+		&build.Branch,
+		&build.Remote); err != nil {
 
 		fmt.Println(err)
 	}
@@ -140,7 +143,8 @@ func getBuilds(db *sql.DB) []*buildInfo {
 		if err := rows.Scan(&build.ID,
 			&build.Name,
 			&build.AbsolutePath,
-			&build.Branch); err != nil {
+			&build.Branch,
+			&build.Remote); err != nil {
 
 			fmt.Println(err)
 		}
