@@ -39,6 +39,8 @@ func main() {
 		startAction(nil, args[1])
 	case "list":
 		listAction(args[1])
+	case "set":
+		setAction(args[1], args[2])
 	}
 
 	fmt.Println()
@@ -49,6 +51,10 @@ func main() {
 func addAction(dir string, flags map[string]string) {
 	if _, exists := flags["-s"]; exists {
 		addService(dir, flags)
+		return
+	}
+	if _, exists := flags["-r"]; exists {
+		addFromRemote(flags["-n"], flags["-r"], flags["-b"])
 		return
 	}
 
@@ -138,6 +144,13 @@ func buildAction(name string, flags map[string]string) {
 		ref = "refs/heads/" + buildInfo.Branch
 	}
 
+	// In the case that we are using a remote, we should update it
+	// before trying to build with it
+	if buildInfo.Remote != "" {
+		cloneOrFetch(*buildInfo)
+		ref = "refs/remotes/origin/" + buildInfo.Branch
+	}
+
 	inflateRef(ref, buildInfo.AbsolutePath, snapshotName)
 
 	snapshotDir := path.Join(getStorageBase(), snapshotName)
@@ -172,6 +185,8 @@ func buildAction(name string, flags map[string]string) {
 				fmt.Println(string(output))
 				fmt.Println(err)
 			}
+
+			// TODO: Read and compile the test results
 
 			return
 		}
@@ -214,11 +229,11 @@ func listAction(listType string) {
 	switch listType {
 
 	case "builds":
-		fmt.Print("#\tNAME\t\tBRANCH\t\tPATH\n--------------------------------------------\n")
+		fmt.Print("#\tNAME\t\tBRANCH\t\tPATH\t\tREMOTE\n--------------------------------------------\n")
 		builds := getBuilds(nil)
 		for i := 0; i < len(builds); i++ {
-			fmt.Printf("%d.\t%s\t%s\t%s\n", i+1,
-				builds[i].Name, builds[i].Branch, builds[i].AbsolutePath)
+			fmt.Printf("%d.\t%s\t%s\t%s\t%s\n", i+1,
+				builds[i].Name, builds[i].Branch, builds[i].AbsolutePath, builds[i].Remote)
 		}
 
 	case "services":
@@ -229,6 +244,13 @@ func listAction(listType string) {
 				services[i].Name, services[i].Args, services[i].AbsolutePath)
 		}
 	}
+}
+
+// Set the value of a nitely property
+// In the database
+func setAction(name, value string) {
+	setProperty(nil, name, value)
+	fmt.Printf("Property %s set with a value of %s\n", name, value)
 }
 
 // Creates a map of command line flags and their values

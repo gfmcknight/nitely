@@ -6,11 +6,22 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"os/exec"
 	"path"
 	"time"
 )
 
+// Access token for github can be stored in a file in plaintext
+// or as a property
 func getToken() string {
+
+	tokenPtr := getProperty(nil, "github.token")
+
+	if tokenPtr != nil {
+		return *tokenPtr
+	}
+
 	tokenFile := path.Join(getStorageBase(), ".token")
 	token, err := ioutil.ReadFile(tokenFile)
 	if err != nil {
@@ -66,6 +77,7 @@ func requestJSON(method, url, token string,
 	return request(method, url, token, queryString, json)
 }
 
+// Steals a final design philosophy statement from Github
 func getZen() string {
 	resp, err := requestString("GET", "/zen", getToken(), "", "")
 	if err != nil {
@@ -82,6 +94,8 @@ func getZen() string {
 	return string(body)
 }
 
+// Makes a github api request to set the build status
+// for a given commit
 func setStatus(owner, repoName, status, commitID string) {
 	queries := make(map[string]interface{})
 	body := make(map[string]interface{})
@@ -92,4 +106,53 @@ func setStatus(owner, repoName, status, commitID string) {
 
 	url := fmt.Sprintf("/repos/%s/%s/statuses/%s", owner, repoName, commitID)
 	requestJSON("POST", url, getToken(), queries, body)
+}
+
+// Creates a remote from a specified repository. The remote
+// comes in the form user/repository.
+func addFromRemote(name, remote, branch string) {
+	if name == "" || branch == "" {
+		panic("Remotes specify name, and branch!")
+	}
+
+	info := buildInfo{}
+	info.Name = name
+	info.Branch = branch
+	info.Remote = remote
+	info.AbsolutePath = path.Join(getStorageBase(), "remotes", remote)
+
+	fmt.Printf("Added build %s on branch %s from repo %s\n", info.Name, info.Branch, info.Remote)
+
+	insertBuildInfo(nil, info)
+}
+
+// Clones down a repository based on its information
+func cloneOrFetch(build buildInfo) {
+	os.Chdir(getStorageBase())
+	if _, err := os.Stat(build.AbsolutePath); os.IsNotExist(err) {
+		err := os.MkdirAll(build.AbsolutePath, os.ModeDir)
+		if err != nil {
+			fmt.Printf("Error creating the path %s", build.AbsolutePath)
+		}
+
+		// TODO: Fix (potential security risk)
+		url := fmt.Sprintf("https://%s@github.com/%s.git", getToken(), build.Remote)
+
+		cmd := exec.Command("git", "clone", url, build.AbsolutePath)
+		err = cmd.Run()
+		if err != nil {
+			fmt.Println(err)
+			fmt.Printf("... When trying to clone %s\n", url)
+		}
+	}
+
+	// Fetch updates from the remote if necessary
+	os.Chdir(build.AbsolutePath)
+	cmd := exec.Command("git", "fetch")
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println(err)
+		fmt.Printf("... When trying to fetch for %s\n", build.Name)
+	}
+
 }

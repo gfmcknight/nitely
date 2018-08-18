@@ -42,7 +42,6 @@ func openAndCreateStorage() *sql.DB {
 		path STRING NOT NULL,
 		branch STRING,
 		remote STRING);`
-
 	_, err = db.Exec(statement)
 	if err != nil {
 		fmt.Printf("%q: %s", err, statement)
@@ -55,7 +54,17 @@ func openAndCreateStorage() *sql.DB {
 		name STRING NOT NULL UNIQUE,
 		path STRING NOT NULL,
 		args STRING);`
+	_, err = db.Exec(statement)
+	if err != nil {
+		fmt.Printf("%q: %s", err, statement)
+		panic(err)
+	}
 
+	statement = `
+	CREATE TABLE IF NOT EXISTS properties(
+		id INTEGER NOT NULL PRIMARY KEY,
+		name STRING NOT NULL UNIQUE,
+		value STRING);`
 	_, err = db.Exec(statement)
 	if err != nil {
 		fmt.Printf("%q: %s", err, statement)
@@ -63,6 +72,52 @@ func openAndCreateStorage() *sql.DB {
 	}
 
 	return db
+}
+
+func getProperty(db *sql.DB, name string) *string {
+	statement := `SELECT value FROM properties WHERE name = ?`
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	result := db.QueryRow(statement, name)
+
+	var value string
+	err := result.Scan(&value)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return &value
+}
+
+func setProperty(db *sql.DB, name, value string) {
+	insert := `
+	INSERT INTO properties VALUES(
+		(SELECT id FROM properties WHERE name = ?),
+		?, ?);`
+
+	replace := `
+	UPDATE properties SET value = ? WHERE name = ?;`
+
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	var err error
+	if getProperty(db, name) == nil {
+		_, err = db.Exec(insert, name, name, value)
+	} else {
+		_, err = db.Exec(replace, value, name)
+	}
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func insertBuildInfo(db *sql.DB, info buildInfo) {

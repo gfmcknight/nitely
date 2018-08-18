@@ -1,7 +1,6 @@
 # Nitely
 
-Nitely is a local build service that allows users to build their
-projects at specified times more easily.
+Nitely is a local build service.
 
 ## Prerequisites
 
