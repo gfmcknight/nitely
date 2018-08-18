@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/jinzhu/gorm"
 )
 
 func main() {
@@ -215,7 +216,7 @@ func startDependencies(filename string) {
 }
 
 // Starts a specified service
-func startAction(db *sql.DB, name string) {
+func startAction(db *gorm.DB, name string) {
 	service := getServiceInfo(db, name)
 	cmd := exec.Command(service.AbsolutePath, service.Args)
 	err := cmd.Start()

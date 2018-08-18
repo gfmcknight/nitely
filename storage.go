@@ -1,297 +1,167 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type buildInfo struct {
-	ID           int
-	Name         string
+	gorm.Model
+	Name         string `gorm:"not null;unique"`
 	AbsolutePath string
 	Branch       string
 	Remote       string
 }
 
 type serviceInfo struct {
-	ID           int
-	Name         string
+	gorm.Model
+	Name         string `gorm:"not null;unique"`
 	AbsolutePath string
 	Args         string
+}
+
+type property struct {
+	gorm.Model
+	Name  string `gorm:"not null;unique"`
+	Value string
 }
 
 func getStorageBase() string {
 	return os.Getenv("NitelyPath")
 }
 
-func openAndCreateStorage() *sql.DB {
-	db, err := sql.Open("sqlite3", filepath.Join(getStorageBase()+"/build-info.db"))
+func openAndCreateStorage() *gorm.DB {
+	db, err := gorm.Open("sqlite3", filepath.Join(getStorageBase(), "build-info.db"))
 	if err != nil {
-		fmt.Print(err)
 		panic(err)
 	}
 
-	statement := `
-	CREATE TABLE IF NOT EXISTS builds(
-		id INTEGER NOT NULL PRIMARY KEY,
-		name STRING NOT NULL UNIQUE,
-		path STRING NOT NULL,
-		branch STRING,
-		remote STRING);`
-	_, err = db.Exec(statement)
-	if err != nil {
-		fmt.Printf("%q: %s", err, statement)
-		panic(err)
-	}
-
-	statement = `
-	CREATE TABLE IF NOT EXISTS services(
-		id INTEGER NOT NULL PRIMARY KEY,
-		name STRING NOT NULL UNIQUE,
-		path STRING NOT NULL,
-		args STRING);`
-	_, err = db.Exec(statement)
-	if err != nil {
-		fmt.Printf("%q: %s", err, statement)
-		panic(err)
-	}
-
-	statement = `
-	CREATE TABLE IF NOT EXISTS properties(
-		id INTEGER NOT NULL PRIMARY KEY,
-		name STRING NOT NULL UNIQUE,
-		value STRING);`
-	_, err = db.Exec(statement)
-	if err != nil {
-		fmt.Printf("%q: %s", err, statement)
-		panic(err)
-	}
-
+	db.AutoMigrate(&buildInfo{}, &serviceInfo{}, &property{})
 	return db
 }
 
-func getProperty(db *sql.DB, name string) *string {
-	statement := `SELECT value FROM properties WHERE name = ?`
+func getProperty(db *gorm.DB, name string) *string {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	result := db.QueryRow(statement, name)
-
-	var value string
-	err := result.Scan(&value)
-	if err == sql.ErrNoRows {
+	var prop property
+	if db.Where("name = ?", name).First(&prop).RecordNotFound() {
 		return nil
 	}
-	if err != nil {
-		fmt.Println(err)
-	}
 
-	return &value
+	return &prop.Value
 }
 
-func setProperty(db *sql.DB, name, value string) {
-	insert := `
-	INSERT INTO properties VALUES(
-		(SELECT id FROM properties WHERE name = ?),
-		?, ?);`
-
-	replace := `
-	UPDATE properties SET value = ? WHERE name = ?;`
-
+func setProperty(db *gorm.DB, name, value string) {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	var err error
-	if getProperty(db, name) == nil {
-		_, err = db.Exec(insert, name, name, value)
-	} else {
-		_, err = db.Exec(replace, value, name)
-	}
-	if err != nil {
-		fmt.Println(err)
-	}
+	var prop property
+	db.FirstOrInit(&prop, property{Name: name})
+	prop.Value = value
+	db.Save(&prop)
 }
 
-func insertBuildInfo(db *sql.DB, info buildInfo) {
-	statement := `
-	INSERT INTO builds(name, path, branch, remote)
-	VALUES(?, ?, ?, ?)`
-
+func insertBuildInfo(db *gorm.DB, info buildInfo) {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	_, err := db.Exec(statement, info.Name, info.AbsolutePath, info.Branch, info.Remote)
-	if err != nil {
-		fmt.Println(err)
+	db.Create(&info)
+	if db.Error != nil {
+		fmt.Println(db.Error)
 	}
 }
 
-func deleteBuildInfo(db *sql.DB, name string) {
-	statement := `
-	DELETE FROM builds
-	WHERE name = ?`
-
+func deleteBuildInfo(db *gorm.DB, name string) {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	_, err := db.Exec(statement, name)
-	if err != nil {
-		fmt.Println(err)
-	}
+	var build buildInfo
+	db.Where("name = ?", name).First(&build).Delete(&build)
 }
 
-func getBuildInfo(db *sql.DB, name string) *buildInfo {
-	statement := `
-	SELECT * FROM builds b
-	WHERE b.name == ?`
-
+func getBuildInfo(db *gorm.DB, name string) *buildInfo {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	build := buildInfo{}
-	results := db.QueryRow(statement, name)
-
-	if err := results.Scan(&build.ID,
-		&build.Name,
-		&build.AbsolutePath,
-		&build.Branch,
-		&build.Remote); err != nil {
-
-		fmt.Println(err)
+	var build buildInfo
+	if db.Where("name = ?", name).First(&build).RecordNotFound() {
+		return nil
 	}
 
 	return &build
 }
 
-func getBuilds(db *sql.DB) []*buildInfo {
-	statement := `
-	SELECT * FROM builds`
-
+func getBuilds(db *gorm.DB) []*buildInfo {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	rows, err := db.Query(statement)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	builds := make([]*buildInfo, 0)
-
-	for rows.Next() {
-		build := buildInfo{}
-		if err := rows.Scan(&build.ID,
-			&build.Name,
-			&build.AbsolutePath,
-			&build.Branch,
-			&build.Remote); err != nil {
-
-			fmt.Println(err)
-		}
-		builds = append(builds, &build)
-	}
-
+	var builds []*buildInfo
+	db.Find(&builds)
 	return builds
 }
 
-func insertServiceInfo(db *sql.DB, info serviceInfo) {
-	statement := `
-	INSERT INTO services(name, path, args)
-	VALUES(?, ?, ?)`
-
+func insertServiceInfo(db *gorm.DB, info serviceInfo) {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	_, err := db.Exec(statement, info.Name, info.AbsolutePath, info.Args)
-	if err != nil {
-		fmt.Println(err)
+	db.Create(&info)
+	if db.Error != nil {
+		fmt.Println(db.Error)
 	}
 }
 
-func deleteServiceInfo(db *sql.DB, name string) {
-	statement := `
-	DELETE FROM services
-	WHERE name = ?`
-
+func deleteServiceInfo(db *gorm.DB, name string) {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	_, err := db.Exec(statement, name)
-	if err != nil {
-		fmt.Println(err)
-	}
+	var service serviceInfo
+	db.Where("name = ?", name).First(&service).Delete(&service)
 }
 
-func getServiceInfo(db *sql.DB, name string) *serviceInfo {
-	statement := `
-	SELECT * FROM services s
-	WHERE s.name == ?`
-
+func getServiceInfo(db *gorm.DB, name string) *serviceInfo {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	service := serviceInfo{}
-	results := db.QueryRow(statement, name)
-
-	if err := results.Scan(&service.ID,
-		&service.Name,
-		&service.AbsolutePath,
-		&service.Args); err != nil {
-
-		fmt.Println(err)
+	var service serviceInfo
+	if db.Where("name = ?", name).First(&service).RecordNotFound() {
+		return nil
 	}
 
 	return &service
 }
 
-func getServices(db *sql.DB) []*serviceInfo {
-	statement := `
-	SELECT * FROM services`
-
+func getServices(db *gorm.DB) []*serviceInfo {
 	if db == nil {
 		db = openAndCreateStorage()
 		defer db.Close()
 	}
 
-	rows, err := db.Query(statement)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	services := make([]*serviceInfo, 0)
-
-	for rows.Next() {
-		service := serviceInfo{}
-		if err := rows.Scan(&service.ID,
-			&service.Name,
-			&service.AbsolutePath,
-			&service.Args); err != nil {
-
-			fmt.Println(err)
-		}
-		services = append(services, &service)
-	}
-
+	var services []*serviceInfo
+	db.Find(&services)
 	return services
 }
