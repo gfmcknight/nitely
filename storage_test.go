@@ -1,9 +1,10 @@
 package main
 
 import (
-	"database/sql"
 	"os"
 	"testing"
+
+	"github.com/jinzhu/gorm"
 )
 
 func TestBuildInfoInsertion(t *testing.T) {
@@ -11,7 +12,7 @@ func TestBuildInfoInsertion(t *testing.T) {
 	const test2 = "test_2"
 	const test3 = "test_3"
 
-	db, err := sql.Open("sqlite3", "test.db")
+	db, err := gorm.Open("sqlite3", "test.db")
 	defer func() {
 		db.Close()
 		os.Remove("test.db")
@@ -21,15 +22,8 @@ func TestBuildInfoInsertion(t *testing.T) {
 		t.Error(err)
 	}
 
-	statement := `
-	CREATE TABLE IF NOT EXISTS builds(
-		id INTEGER NOT NULL PRIMARY KEY,
-		name STRING NOT NULL UNIQUE,
-		path STRING NOT NULL,
-		branch STRING);`
-
-	_, err = db.Exec(statement)
-	if err != nil {
+	db.AutoMigrate(&buildInfo{})
+	if db.Error != nil {
 		t.Error(err)
 	}
 
@@ -55,14 +49,9 @@ func TestProperties(t *testing.T) {
 	const value1 = "value1"
 	const value2 = "value2"
 
-	db, err := sql.Open("sqlite3", "test.db")
+	db, err := gorm.Open("sqlite3", "test.db")
 
-	statement := `
-	CREATE TABLE IF NOT EXISTS properties(
-		id INTEGER NOT NULL PRIMARY KEY,
-		name STRING NOT NULL UNIQUE,
-		value STRING);`
-	_, err = db.Exec(statement)
+	db.AutoMigrate(&property{})
 	if err != nil {
 		t.Error(err)
 	}

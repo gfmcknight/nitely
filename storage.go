@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/jinzhu/gorm"
@@ -30,10 +29,6 @@ type property struct {
 	gorm.Model
 	Name  string `gorm:"not null;unique"`
 	Value string
-}
-
-func getStorageBase() string {
-	return os.Getenv("NitelyPath")
 }
 
 func openAndCreateStorage() *gorm.DB {

@@ -24,24 +24,23 @@ func main() {
 		return
 	}
 
-	if len(args) < 1 {
+	argSet := makeArgSet(args)
+	if !argSet.hasArg(0) {
 		fmt.Printf("USAGE\n")
 		return
 	}
 
-	switch args[0] {
+	switch argSet.getArg(0) {
 	case "add":
-		addAction(dir, getFlags(args))
+		addAction(dir, argSet)
 	case "remove":
-		removeAction(args[1], getFlags(args))
+		removeAction(argSet)
 	case "build":
-		buildAction(args[1], getFlags(args))
-	case "start":
-		startAction(nil, args[1])
+		buildAction(argSet)
 	case "list":
-		listAction(args[1])
+		listAction(argSet)
 	case "set":
-		setAction(args[1], args[2])
+		setAction(argSet)
 	}
 
 	fmt.Println()
@@ -49,18 +48,18 @@ func main() {
 }
 
 // Adds a new build or service to the database
-func addAction(dir string, flags map[string]string) {
-	if _, exists := flags["-s"]; exists {
-		addService(dir, flags)
+func addAction(dir string, args argSet) {
+	if args.hasArg(serviceType) {
+		addService(dir, args)
 		return
 	}
-	if _, exists := flags["-r"]; exists {
-		addFromRemote(flags["-n"], flags["-r"], flags["-b"])
+	if args.hasArg(remoteType) {
+		addFromRemote(args.getArg(nameType), args.getArg(remoteType), args.getArg(branchType))
 		return
 	}
 
-	if newDir, exists := flags["-d"]; exists {
-		newDir, err := filepath.Abs(newDir)
+	if args.hasArg(dirType) {
+		newDir, err := filepath.Abs(args.getArg(dirType))
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -74,11 +73,11 @@ func addAction(dir string, flags map[string]string) {
 		Branch:       "",           // Use the branch of the working tree
 	}
 
-	if name, exists := flags["-n"]; exists {
-		toAdd.Name = name
+	if args.hasArg(nameType) {
+		toAdd.Name = args.getArg(nameType)
 	}
-	if branch, exists := flags["-b"]; exists {
-		toAdd.Branch = branch
+	if args.hasArg(branchType) {
+		toAdd.Branch = args.getArg(branchType)
 	}
 
 	insertBuildInfo(nil, toAdd)
@@ -86,9 +85,9 @@ func addAction(dir string, flags map[string]string) {
 }
 
 // Adds a service that can be started before building
-func addService(dir string, flags map[string]string) {
-	if newDir, exists := flags["-d"]; exists {
-		newDir, err := filepath.Abs(newDir)
+func addService(dir string, args argSet) {
+	if args.hasArg(dirType) {
+		newDir, err := filepath.Abs(args.getArg(dirType))
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -102,7 +101,7 @@ func addService(dir string, flags map[string]string) {
 		return
 	}
 
-	serviceFilename := flags["-s"]
+	serviceFilename := args.getArg(serviceType)
 	if !containsFile(serviceFilename, files) {
 		fmt.Printf("Could not find file %s in directory %s\n", serviceFilename, dir)
 		return
@@ -114,29 +113,39 @@ func addService(dir string, flags map[string]string) {
 		Args:         "",
 	}
 
-	if name, exists := flags["-n"]; exists {
-		toAdd.Name = name
+	if args.hasArg(nameType) {
+		toAdd.Name = args.getArg(nameType)
 	}
 
-	if args, exists := flags["-a"]; exists {
-		toAdd.Args = args
+	if args.hasArg(argsType) {
+		toAdd.Args = args.getArg(argsType)
 	}
 
 	insertServiceInfo(nil, toAdd)
 }
 
 // Removes a build or service from the database
-func removeAction(name string, flags map[string]string) {
-	if _, exists := flags["-s"]; exists {
-		deleteServiceInfo(nil, name)
+func removeAction(args argSet) {
+	if !args.hasArg(1) {
+		fmt.Println("Please specify the item to remove from nitely.")
+		return
+	}
+
+	if args.hasArg(serviceType) {
+		deleteServiceInfo(nil, args.getArg(1))
 	} else {
-		deleteBuildInfo(nil, name)
+		deleteBuildInfo(nil, args.getArg(1))
 	}
 }
 
 // Runs a build of the given repository
-func buildAction(name string, flags map[string]string) {
-	buildInfo := getBuildInfo(nil, name)
+func buildAction(args argSet) {
+	if !args.hasArg(1) {
+		fmt.Println("Please specify the item to build.")
+		return
+	}
+
+	buildInfo := getBuildInfo(nil, args.getArg(1))
 	snapshotName := fmt.Sprintf("SNAP-%s-%s",
 		buildInfo.Name, time.Now().Format("2006-01-02-150405"))
 
@@ -166,9 +175,8 @@ func buildAction(name string, flags map[string]string) {
 	if containsFile(dependencyFile, files) {
 		startDependencies(dependencyFile)
 		// If we start dependencies, wait some time for them to start
-		// This will ideally later be variable/configurable on a project basis
 		fmt.Printf("Waiting one minute for services to start...\n")
-		time.Sleep(60 * time.Second)
+		time.Sleep(sleepTime(args.getArg(0)))
 	}
 
 	for _, filename := range buildFiles {
@@ -211,12 +219,12 @@ func startDependencies(filename string) {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		startAction(db, scanner.Text())
+		startService(db, scanner.Text())
 	}
 }
 
 // Starts a specified service
-func startAction(db *gorm.DB, name string) {
+func startService(db *gorm.DB, name string) {
 	service := getServiceInfo(db, name)
 	cmd := exec.Command(service.AbsolutePath, service.Args)
 	err := cmd.Start()
@@ -226,8 +234,13 @@ func startAction(db *gorm.DB, name string) {
 }
 
 // Prints a list of builds to the user that they can run
-func listAction(listType string) {
-	switch listType {
+func listAction(args argSet) {
+	if !args.hasArg(1) {
+		fmt.Println("Please specify whether to list builds or services.")
+		return
+	}
+
+	switch args.getArg(1) {
 
 	case "builds":
 		fmt.Print("#\tNAME\t\tBRANCH\t\tPATH\t\tREMOTE\n--------------------------------------------\n")
@@ -249,44 +262,12 @@ func listAction(listType string) {
 
 // Set the value of a nitely property
 // In the database
-func setAction(name, value string) {
-	setProperty(nil, name, value)
-	fmt.Printf("Property %s set with a value of %s\n", name, value)
-}
-
-// Creates a map of command line flags and their values
-// entered by the user.
-func getFlags(args []string) map[string]string {
-	flags := make(map[string]string)
-
-	for i := 0; i < len(args); i++ {
-		if args[i][0] == '-' {
-			if i < len(args)-1 {
-				flags[args[i]] = args[i+1]
-			} else {
-				flags[args[i]] = " "
-			}
-		}
+func setAction(args argSet) {
+	if !args.hasArg(2) {
+		fmt.Println("Please the name of the property and the property value.")
+		return
 	}
 
-	return flags
-}
-
-// Determines whether a directory lists a file under the
-// the given name.
-func containsFile(name string, files []os.FileInfo) bool {
-	for _, file := range files {
-		if file.Name() == name {
-			return true
-		}
-	}
-	return false
-}
-
-// pathEnd gets the final segment of a path.
-// For example, /usr/local/bin would yield bin
-func pathEnd(dir string) string {
-	dir = strings.Replace(dir, "\\", "/", -1)
-	tokens := strings.Split(dir, "/")
-	return tokens[len(tokens)-1]
+	setProperty(nil, args.getArg(1), args.getArg(2))
+	fmt.Printf("Property %s set with a value of %s\n", args.getArg(1), args.getArg(2))
 }
