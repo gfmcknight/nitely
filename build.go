@@ -20,7 +20,9 @@ func buildAction(args argSet) {
 		return
 	}
 
-	buildInfo := getBuildInfo(nil, args.getArg(1))
+	db := openAndCreateStorage()
+
+	buildInfo := getBuildInfo(db, args.getArg(1))
 	snapshotName := fmt.Sprintf("SNAP-%s-%s",
 		buildInfo.Name, time.Now().Format("2006-01-02-150405"))
 
@@ -70,7 +72,32 @@ func buildAction(args argSet) {
 				fmt.Println(err)
 			}
 
-			// TODO: Read and compile the test results
+			if _, err := os.Stat(resultsFile); os.IsNotExist(err) {
+				fmt.Printf("No file %s to take results from!", resultsFile)
+				return
+			}
+
+			file, err := os.Open(resultsFile)
+			if err != nil {
+				fmt.Println(err)
+			}
+			defer file.Close()
+
+			scanner := bufio.NewScanner(file)
+			run := testRun{
+				DateRun: time.Now(),
+				Build:   *buildInfo,
+				Results: make([]testResult, 0),
+			}
+
+			for scanner.Scan() {
+				run.Results = append(run.Results, testResult{
+					Passed:   scanner.Text()[0] == 'P',
+					TestName: scanner.Text()[1:],
+				})
+			}
+
+			insertTestRun(db, run)
 
 			return
 		}

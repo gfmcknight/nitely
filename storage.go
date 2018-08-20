@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -31,13 +32,27 @@ type property struct {
 	Value string
 }
 
+type testRun struct {
+	gorm.Model
+	Results []testResult
+	DateRun time.Time
+	Build   buildInfo
+}
+
+type testResult struct {
+	gorm.Model
+	TestName  string
+	Passed    bool
+	TestRunID uint
+}
+
 func openAndCreateStorage() *gorm.DB {
 	db, err := gorm.Open("sqlite3", filepath.Join(getStorageBase(), "build-info.db"))
 	if err != nil {
 		panic(err)
 	}
 
-	db.AutoMigrate(&buildInfo{}, &serviceInfo{}, &property{})
+	db.AutoMigrate(&buildInfo{}, &serviceInfo{}, &property{}, &testRun{}, &testResult{})
 	return db
 }
 
@@ -159,4 +174,27 @@ func getServices(db *gorm.DB) []*serviceInfo {
 	var services []*serviceInfo
 	db.Find(&services)
 	return services
+}
+
+func insertTestRun(db *gorm.DB, run testRun) {
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	db.Create(run)
+}
+
+func getLastRun(db *gorm.DB, build buildInfo) *testRun {
+	if db == nil {
+		db = openAndCreateStorage()
+		defer db.Close()
+	}
+
+	var run testRun
+	db.Where("BuildID = ?", build.ID).Order("DateRun").Last(&run)
+	if db.RecordNotFound() {
+		return nil
+	}
+	return &run
 }
