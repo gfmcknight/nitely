@@ -32,6 +32,8 @@ func main() {
 		listAction(argSet)
 	case "set":
 		setAction(argSet)
+	case "start":
+		startService(nil, argSet.getArg(1))
 	}
 
 	fmt.Println()
