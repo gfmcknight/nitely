@@ -2,6 +2,10 @@
 
 Nitely is a local build service.
 
+## Authorship information
+
+I'd like to draw to your attention Roland Singer, not me, wrote copy.go.
+
 ## Prerequisites
 
 Nitely currently requires Golang and an SQLite3 driver from mattn.
