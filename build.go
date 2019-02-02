@@ -26,19 +26,7 @@ func buildAction(args argSet) {
 	snapshotName := fmt.Sprintf("SNAP-%s-%s",
 		buildInfo.Name, time.Now().Format("2006-01-02-150405"))
 
-	ref := ""
-	if buildInfo.Branch != "" {
-		ref = "refs/heads/" + buildInfo.Branch
-	}
-
-	// In the case that we are using a remote, we should update it
-	// before trying to build with it
-	if buildInfo.Remote != "" {
-		cloneOrFetch(*buildInfo)
-		ref = "refs/remotes/origin/" + buildInfo.Branch
-	}
-
-	inflateRef(ref, buildInfo.AbsolutePath, snapshotName)
+	cloneAndCheckout(*buildInfo, snapshotName)
 
 	snapshotDir := path.Join(getStorageBase(), snapshotName)
 	os.Chdir(snapshotDir)
@@ -50,6 +38,7 @@ func buildAction(args argSet) {
 	}
 
 	if containsFile(dependencyFile, files) {
+		fmt.Println("Starting services")
 		startDependencies(dependencyFile)
 		// If we start dependencies, wait some time for them to start
 		fmt.Printf("Waiting one minute for services to start...\n")
@@ -64,7 +53,7 @@ func buildAction(args argSet) {
 			}
 
 			fmt.Printf("Running file: %s\n", filename)
-			cmd := exec.Command(runner, fmt.Sprintf("./%s", filename))
+			cmd := exec.Command(runner, fmt.Sprintf("./%s %s", filename, buildInfo.AbsolutePath))
 
 			output, err := cmd.CombinedOutput()
 			if err != nil {

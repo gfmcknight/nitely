@@ -146,13 +146,13 @@ func sleepTime(build string) time.Duration {
 	}
 	if timeStr == nil {
 		// Our default wait after services is 60 seconds
-		return 60
+		return time.Duration(60) * time.Second
 	}
 
 	// Unfortunate string-typing on properties
 	timeInt, err := strconv.Atoi(*timeStr)
 	if err != nil {
-		return 60
+		return time.Duration(60) * time.Second
 	}
 	return time.Duration(timeInt) * time.Second
 }

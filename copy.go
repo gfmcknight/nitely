@@ -79,6 +79,7 @@ func copyFile(src, dst string) (err error) {
 // Source directory must exist, destination directory must *not* exist.
 // Symlinks are ignored and skipped.
 func copyDir(src string, dst string) (err error) {
+	fmt.Println(dst)
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
 

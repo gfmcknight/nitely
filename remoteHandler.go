@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"os/exec"
 	"path"
 	"time"
 )
@@ -124,35 +122,4 @@ func addFromRemote(name, remote, branch string) {
 	fmt.Printf("Added build %s on branch %s from repo %s\n", info.Name, info.Branch, info.Remote)
 
 	insertBuildInfo(nil, info)
-}
-
-// Clones down a repository based on its information
-func cloneOrFetch(build buildInfo) {
-	os.Chdir(getStorageBase())
-	if _, err := os.Stat(build.AbsolutePath); os.IsNotExist(err) {
-		err := os.MkdirAll(build.AbsolutePath, os.ModeDir)
-		if err != nil {
-			fmt.Printf("Error creating the path %s", build.AbsolutePath)
-		}
-
-		// TODO: Fix (potential security risk)
-		url := fmt.Sprintf("https://%s@github.com/%s.git", getToken(), build.Remote)
-
-		cmd := exec.Command("git", "clone", url, build.AbsolutePath)
-		err = cmd.Run()
-		if err != nil {
-			fmt.Println(err)
-			fmt.Printf("... When trying to clone %s\n", url)
-		}
-	}
-
-	// Fetch updates from the remote if necessary
-	os.Chdir(build.AbsolutePath)
-	cmd := exec.Command("git", "fetch")
-	err := cmd.Run()
-	if err != nil {
-		fmt.Println(err)
-		fmt.Printf("... When trying to fetch for %s\n", build.Name)
-	}
-
 }
