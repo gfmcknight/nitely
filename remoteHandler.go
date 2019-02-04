@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os/exec"
 	"path"
 	"time"
 )
@@ -94,7 +95,7 @@ func getZen() string {
 
 // Makes a github api request to set the build status
 // for a given commit
-func setStatus(owner, repoName, status, commitID string) {
+func setStatus(repoName, status, commitID string) {
 	queries := make(map[string]interface{})
 	body := make(map[string]interface{})
 	body["state"] = status
@@ -102,8 +103,26 @@ func setStatus(owner, repoName, status, commitID string) {
 	body["description"] = "The build ended in " + status
 	body["context"] = "continuous-integration/nitely"
 
-	url := fmt.Sprintf("/repos/%s/%s/statuses/%s", owner, repoName, commitID)
-	requestJSON("POST", url, getToken(), queries, body)
+	url := fmt.Sprintf("/repos/%s/statuses/%s", repoName, commitID)
+	resp, err := requestJSON("POST", url, getToken(), queries, body)
+	if resp.StatusCode != 201 {
+		rb, _ := ioutil.ReadAll(resp.Body)
+		fmt.Println(string(rb))
+	}
+
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func getCommitID() string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return string(out)[0:40]
 }
 
 // Creates a remote from a specified repository. The remote

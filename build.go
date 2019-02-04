@@ -109,7 +109,7 @@ func saveResults(db *gorm.DB, buildInfo *buildInfo, filename string) {
 		db = openAndCreateStorage()
 	}
 
-	file, err := os.Open(resultsFile)
+	file, err := os.Open(filename)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -122,11 +122,22 @@ func saveResults(db *gorm.DB, buildInfo *buildInfo, filename string) {
 		Results: make([]testResult, 0),
 	}
 
+	passedAll := true
 	for scanner.Scan() {
 		run.Results = append(run.Results, testResult{
 			Passed:   scanner.Text()[0] == 'P',
 			TestName: scanner.Text()[1:],
 		})
+
+		if !run.Results[len(run.Results)-1].Passed {
+			passedAll = false
+		}
+	}
+
+	if passedAll {
+		setStatus(buildInfo.Remote, "success", getCommitID())
+	} else {
+		setStatus(buildInfo.Remote, "failure", getCommitID())
 	}
 
 	insertTestRun(db, run)
