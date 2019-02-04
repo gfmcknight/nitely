@@ -198,7 +198,7 @@ func getLastRun(db *gorm.DB, build buildInfo) *testRun {
 
 	var runs []testRun
 	var run testRun
-	db.Where("build_id = ?", build.ID).Order("date_run").Limit(1).Find(&runs)
+	db.Where("build_id = ?", build.ID).Order("date_run desc").Limit(1).Find(&runs)
 	run = runs[0]
 	db.Where("test_run_id = ?", run.ID).Find(&run.Results)
 
