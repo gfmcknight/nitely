@@ -117,8 +117,8 @@ func saveResults(db *gorm.DB, buildInfo *buildInfo, filename string) {
 
 	scanner := bufio.NewScanner(file)
 	run := testRun{
-		DateRun: time.Now().Unix(),
-		Build:   buildInfo,
+		DateRun: time.Now(),
+		BuildID: buildInfo.ID,
 		Results: make([]testResult, 0),
 	}
 

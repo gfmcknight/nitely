@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/jinzhu/gorm"
+
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -34,8 +36,8 @@ type property struct {
 type testRun struct {
 	gorm.Model
 	Results []testResult `gorm:"foreignkey:TestRunID;association_foreignkey:Refer"`
-	DateRun int64
-	Build   *buildInfo
+	DateRun time.Time
+	BuildID uint
 }
 
 type testResult struct {
@@ -194,8 +196,12 @@ func getLastRun(db *gorm.DB, build buildInfo) *testRun {
 		defer db.Close()
 	}
 
+	var runs []testRun
 	var run testRun
-	db.Where("BuildID = ?", build.ID).Order("DateRun").Last(&run)
+	db.Where("build_id = ?", build.ID).Order("date_run").Limit(1).Find(&runs)
+	run = runs[0]
+	db.Where("test_run_id = ?", run.ID).Find(&run.Results)
+
 	if db.RecordNotFound() {
 		return nil
 	}
