@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"path/filepath"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -34,9 +33,9 @@ type property struct {
 
 type testRun struct {
 	gorm.Model
-	Results []testResult
-	DateRun time.Time
-	Build   buildInfo
+	Results []testResult `gorm:"foreignkey:TestRunID;association_foreignkey:Refer"`
+	DateRun int64
+	Build   *buildInfo
 }
 
 type testResult struct {
@@ -182,7 +181,11 @@ func insertTestRun(db *gorm.DB, run testRun) {
 		defer db.Close()
 	}
 
-	db.Create(run)
+	db.Create(&run)
+	for i := 0; i < len(run.Results); i++ {
+		run.Results[i].TestRunID = run.ID
+		db.Create(&(run.Results[i]))
+	}
 }
 
 func getLastRun(db *gorm.DB, build buildInfo) *testRun {

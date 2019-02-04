@@ -66,27 +66,7 @@ func buildAction(args argSet) {
 				return
 			}
 
-			file, err := os.Open(resultsFile)
-			if err != nil {
-				fmt.Println(err)
-			}
-			defer file.Close()
-
-			scanner := bufio.NewScanner(file)
-			run := testRun{
-				DateRun: time.Now(),
-				Build:   *buildInfo,
-				Results: make([]testResult, 0),
-			}
-
-			for scanner.Scan() {
-				run.Results = append(run.Results, testResult{
-					Passed:   scanner.Text()[0] == 'P',
-					TestName: scanner.Text()[1:],
-				})
-			}
-
-			insertTestRun(db, run)
+			saveResults(db, buildInfo, resultsFile)
 
 			return
 		}
@@ -122,4 +102,32 @@ func startService(db *gorm.DB, name string) {
 	if err != nil {
 		fmt.Println(err)
 	}
+}
+
+func saveResults(db *gorm.DB, buildInfo *buildInfo, filename string) {
+	if db == nil {
+		db = openAndCreateStorage()
+	}
+
+	file, err := os.Open(resultsFile)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	run := testRun{
+		DateRun: time.Now().Unix(),
+		Build:   buildInfo,
+		Results: make([]testResult, 0),
+	}
+
+	for scanner.Scan() {
+		run.Results = append(run.Results, testResult{
+			Passed:   scanner.Text()[0] == 'P',
+			TestName: scanner.Text()[1:],
+		})
+	}
+
+	insertTestRun(db, run)
 }

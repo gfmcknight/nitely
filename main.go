@@ -34,6 +34,9 @@ func main() {
 		setAction(argSet)
 	case "start":
 		startService(nil, argSet.getArg(1))
+	case "save":
+		db := openAndCreateStorage()
+		saveResults(db, getBuildInfo(db, argSet.getArg(1)), argSet.getArg(2))
 	}
 
 	fmt.Println()
